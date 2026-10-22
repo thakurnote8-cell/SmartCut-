@@ -1,7 +1,7 @@
 name: Publish installable web preview
 on:
   push:
-    branches: ["feat/gpt6-planning-foundation", "feat/elite-cuts-operational-mvp"]
+    branches: ["feat/elite-cuts-operational-mvp"]
     paths: ["index.html", "manifest.webmanifest", "sw.js", ".github/workflows/pages-preview.yml"]
   workflow_dispatch:
 permissions:
@@ -20,6 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
