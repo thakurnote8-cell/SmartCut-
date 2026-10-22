@@ -157,3 +157,21 @@ def test_waitlisted_booking_rejects_geofence_events(client):
         "booking_id": waitlisted["id"], "distance_meters": 100
     })
     assert response.status_code == 409
+
+
+def test_delayed_outer_ring_event_cannot_regress_approaching_booking(client):
+    booking = client.post("/v1/bookings", json={
+        "customer_name": "Approaching Customer", "service": "Haircut"
+    }).json()
+    approaching = client.post("/v1/geofence-events", json={
+        "booking_id": booking["id"], "distance_meters": 700
+    })
+    assert approaching.status_code == 200
+    assert approaching.json()["booking"]["status"] == "approaching"
+
+    delayed_outer_ring = client.post("/v1/geofence-events", json={
+        "booking_id": booking["id"], "distance_meters": 2500
+    })
+    assert delayed_outer_ring.status_code == 200
+    assert delayed_outer_ring.json()["booking"]["status"] == "approaching"
+    assert delayed_outer_ring.json()["event"] == "simulated_stale_outer_ring_ignored"
