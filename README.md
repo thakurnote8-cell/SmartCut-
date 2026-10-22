@@ -20,6 +20,7 @@ Open `http://127.0.0.1:8000` for the dashboard and `http://127.0.0.1:8000/docs` 
 
 - SQLite-backed booking records.
 - Queue metrics derived from saved records.
+- Optional GPT-based operational insight endpoint using aggregate counts only; recommendations are advisory and never execute actions.
 - Simulated geofence event transitions at 800 m and 150 m.
 - Guarded service lifecycle and responsive salon dashboard.
 - Automated test workflow.
