@@ -1,4 +1,4 @@
-name: Publish installable web preview
+name: Validate and package web preview
 on:
   push:
     branches: ["feat/elite-cuts-operational-mvp"]
@@ -6,24 +6,30 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: pages-preview
-  cancel-in-progress: true
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  validate-preview:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      - name: Validate required preview files
+        run: |
+          test -s index.html
+          test -s manifest.webmanifest
+          test -s sw.js
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("manifest.webmanifest").read_text())
+          assert manifest.get("name") and manifest.get("start_url") and manifest.get("display")
+          html = Path("index.html").read_text()
+          assert 'rel="manifest"' in html
+          assert "serviceWorker.register" in html
+          print("Preview files and manifest validated.")
+          PY
+      - name: Package browser preview
+        run: zip -j elite-cuts-web-preview.zip index.html manifest.webmanifest sw.js
+      - uses: actions/upload-artifact@v4
         with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          name: elite-cuts-web-preview
+          path: elite-cuts-web-preview.zip
+          if-no-files-found: error
