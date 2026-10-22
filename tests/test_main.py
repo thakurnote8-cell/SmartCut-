@@ -7,7 +7,8 @@ import app.main as cuts
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(cuts, "DB_PATH", str(tmp_path / "test.db"))
     cuts.init_db()
-    return TestClient(cuts.app)
+    monkeypatch.setenv("ELITE_CUTS_API_TOKEN", "test-token-that-is-at-least-thirty-two-characters")
+    return TestClient(cuts.app, headers={"Authorization": "Bearer test-token-that-is-at-least-thirty-two-characters"})
 
 
 def test_health_discloses_demo_limits(client):
@@ -175,3 +176,21 @@ def test_delayed_outer_ring_event_cannot_regress_approaching_booking(client):
     assert delayed_outer_ring.status_code == 200
     assert delayed_outer_ring.json()["booking"]["status"] == "approaching"
     assert delayed_outer_ring.json()["event"] == "simulated_stale_outer_ring_ignored"
+
+
+def test_operational_api_rejects_missing_bearer_token(client):
+    response = TestClient(cuts.app).get("/v1/metrics")
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_operational_api_fails_closed_without_configured_token(client, monkeypatch):
+    monkeypatch.delenv("ELITE_CUTS_API_TOKEN", raising=False)
+    response = TestClient(cuts.app).get("/v1/metrics")
+    assert response.status_code == 503
+    assert "ELITE_CUTS_API_TOKEN" in response.json()["detail"]
+
+
+def test_booking_rejects_unexpected_fields(client):
+    response = client.post("/v1/bookings", json={"customer_name": "Customer", "service": "Haircut", "is_admin": True})
+    assert response.status_code == 422
