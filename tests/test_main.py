@@ -63,3 +63,23 @@ def test_metrics_count_real_database_rows(client):
     client.post("/v1/bookings", json={"customer_name": "Customer One", "service": "Haircut"})
     data = client.get("/v1/metrics").json()
     assert data["active_bookings"] == 1
+
+def test_ai_insight_requires_explicit_provider_configuration(client, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    response = client.post("/v1/ai/operations-insight", json={"salon_id": "test-salon"})
+    assert response.status_code == 503
+    assert "OPENAI_API_KEY" in response.json()["detail"]
+
+
+def test_ai_insight_returns_validated_recommendations(client, monkeypatch):
+    expected = cuts.OperationsInsight(
+        summary="Review the current queue before the next booking.",
+        observations=["One booking is active."],
+        recommendations=["Confirm chair readiness with the salon team."],
+        limitations=["No real GPS or measured service duration was provided."],
+    )
+    monkeypatch.setattr(cuts, "generate_operations_insight", lambda salon_id: expected)
+    response = client.post("/v1/ai/operations-insight", json={"salon_id": "test-salon"})
+    assert response.status_code == 200
+    assert response.json()["recommendations"] == expected.recommendations
