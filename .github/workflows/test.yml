@@ -1,4 +1,5 @@
 name: tests
+# Security gate: compile, test, and audit runtime dependencies
 on:
   push:
     branches: ["main", "feat/**"]
