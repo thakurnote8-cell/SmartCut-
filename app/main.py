@@ -181,6 +181,9 @@ def process_geofence_event(event: GeofenceEvent):
         if current_status == "arrived":
             status = "arrived"
             event_type = "simulated_arrival_already_confirmed"
+        elif current_status == "approaching" and event.distance_meters > 800:
+            status = "approaching"
+            event_type = "simulated_stale_outer_ring_ignored"
         elif event.distance_meters <= 150:
             status = "arrived"
             event_type = "simulated_arrival_triggered"
