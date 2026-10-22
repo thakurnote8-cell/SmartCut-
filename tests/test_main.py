@@ -219,3 +219,12 @@ def test_openapi_documents_bearer_authentication():
     data = schema.json()
     assert data["components"]["securitySchemes"]["BearerAuth"]["scheme"] == "bearer"
     assert data["paths"]["/v1/bookings"]["post"]["security"] == [{"BearerAuth": []}]
+
+
+def test_dashboard_install_assets_are_served(client):
+    manifest = client.get("/manifest.webmanifest")
+    assert manifest.status_code == 200
+    assert manifest.headers["content-type"].startswith("application/manifest+json")
+    worker = client.get("/sw.js")
+    assert worker.status_code == 200
+    assert "Service-Worker-Allowed" in worker.headers
