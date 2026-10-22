@@ -1,0 +1,9 @@
+{
+  "name": "Elite Cuts Preview",
+  "short_name": "Elite Cuts",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#11120f",
+  "theme_color": "#11120f",
+  "description": "Installable salon booking and queue demo"
+}

@@ -1,0 +1,35 @@
+name: Validate and package web preview
+on:
+  push:
+    branches: ["feat/elite-cuts-operational-mvp"]
+    paths: ["index.html", "manifest.webmanifest", "sw.js", ".github/workflows/pages-preview.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate required preview files
+        run: |
+          test -s index.html
+          test -s manifest.webmanifest
+          test -s sw.js
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("manifest.webmanifest").read_text())
+          assert manifest.get("name") and manifest.get("start_url") and manifest.get("display")
+          html = Path("index.html").read_text()
+          assert 'rel="manifest"' in html
+          assert "serviceWorker.register" in html
+          print("Preview files and manifest validated.")
+          PY
+      - name: Package browser preview
+        run: zip -j elite-cuts-web-preview.zip index.html manifest.webmanifest sw.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elite-cuts-web-preview
+          path: elite-cuts-web-preview.zip
+          if-no-files-found: error
