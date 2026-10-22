@@ -83,3 +83,8 @@ def test_ai_insight_returns_validated_recommendations(client, monkeypatch):
     response = client.post("/v1/ai/operations-insight", json={"salon_id": "test-salon"})
     assert response.status_code == 200
     assert response.json()["recommendations"] == expected.recommendations
+
+def test_dashboard_is_served_by_api(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Salon Command" in response.text
