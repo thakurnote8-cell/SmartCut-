@@ -126,7 +126,12 @@ async def require_api_token(request: Request, call_next):
     scheme, _, credential = supplied.partition(" ")
     if scheme.lower() != "bearer" or not credential or not hmac.compare_digest(credential, expected):
         return JSONResponse(status_code=401, content={"detail": "Valid bearer token required."}, headers={"WWW-Authenticate": "Bearer"})
-    return await call_next(request)
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 
 @app.on_event("startup")
@@ -313,7 +318,7 @@ def generate_operations_insight(salon_id: str) -> OperationsInsight:
         "required": ["summary", "observations", "recommendations", "limitations"],
         "additionalProperties": False,
     }
-    response = OpenAI(api_key=api_key).responses.create(
+    response = OpenAI(api_key=api_key, timeout=20.0, max_retries=1).responses.create(
         model=model,
         instructions=(
             "You are Elite Cuts operations analyst. Review only the supplied aggregate counts. "
