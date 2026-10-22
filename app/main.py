@@ -173,6 +173,23 @@ def dashboard():
     return FileResponse(Path(__file__).resolve().parent.parent / "index.html")
 
 
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def web_manifest():
+    return FileResponse(
+        Path(__file__).resolve().parent.parent / "manifest.webmanifest",
+        media_type="application/manifest+json",
+    )
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    return FileResponse(
+        Path(__file__).resolve().parent.parent / "sw.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+    )
+
+
 @app.get("/health")
 def health():
     init_db()
