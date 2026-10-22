@@ -1,6 +1,7 @@
 """Elite Cuts MVP API. Queue and booking state is local SQLite, not a production service."""
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import uuid
