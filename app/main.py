@@ -171,9 +171,17 @@ def process_geofence_event(event: GeofenceEvent):
         row = conn.execute("SELECT * FROM bookings WHERE id=?", (event.booking_id,)).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="Booking not found")
-        if row["status"] in ("cancelled", "completed", "in_service"):
-            raise HTTPException(status_code=409, detail=f"Cannot update booking in status {row['status']}")
-        if event.distance_meters <= 150:
+        current_status = row["status"]
+        if current_status in ("cancelled", "completed", "in_service"):
+            raise HTTPException(status_code=409, detail=f"Cannot update booking in status {current_status}")
+        if current_status == "waitlisted":
+            raise HTTPException(status_code=409, detail="Waitlisted booking has no assigned chair; assign a chair before geofence events")
+        # Geofence updates must be monotonic: a delayed/out-of-order outer-ring event
+        # must never undo a customer's arrival. Service lifecycle endpoints own later states.
+        if current_status == "arrived":
+            status = "arrived"
+            event_type = "simulated_arrival_already_confirmed"
+        elif event.distance_meters <= 150:
             status = "arrived"
             event_type = "simulated_arrival_triggered"
         elif event.distance_meters <= 800:
