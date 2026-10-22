@@ -88,3 +88,38 @@ def test_dashboard_is_served_by_api(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "Salon Command" in response.text
+
+def test_ai_insight_sends_aggregate_counts_not_customer_pii(client, monkeypatch):
+    import json
+    import openai
+
+    client.post("/v1/bookings", json={
+        "customer_name": "Private Test Name",
+        "service": "Haircut",
+        "salon_id": "privacy-test-salon",
+    })
+    expected = cuts.OperationsInsight(
+        summary="One active booking is recorded.",
+        observations=["The database contains one active booking."],
+        recommendations=["Confirm chair readiness."],
+        limitations=["No live GPS or service duration data is available."],
+    )
+    captured = {}
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return type("Response", (), {"output_text": json.dumps(expected.model_dump())})()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.responses = FakeResponses()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_MODEL", "test-model")
+    monkeypatch.setattr(openai, "OpenAI", FakeClient)
+
+    result = cuts.generate_operations_insight("privacy-test-salon")
+    assert result.summary == expected.summary
+    assert "Private Test Name" not in captured["input"]
+    assert "counts_by_status" in captured["input"]
