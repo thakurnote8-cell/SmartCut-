@@ -208,3 +208,14 @@ def test_security_headers_are_set_on_responses(client):
 def test_health_endpoint_remains_public(client):
     response = TestClient(cuts.app).get("/health")
     assert response.status_code == 200
+
+
+def test_openapi_documents_bearer_authentication():
+    client = TestClient(cuts.app)
+    docs = client.get("/docs")
+    schema = client.get("/openapi.json")
+    assert docs.status_code == 200
+    assert schema.status_code == 200
+    data = schema.json()
+    assert data["components"]["securitySchemes"]["BearerAuth"]["scheme"] == "bearer"
+    assert data["paths"]["/v1/bookings"]["post"]["security"] == [{"BearerAuth": []}]
