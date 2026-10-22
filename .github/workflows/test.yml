@@ -1,5 +1,6 @@
 name: tests
 # Security gate: compile, test, and audit runtime dependencies
+# OpenAPI authorization contract is covered by API tests.
 on:
   push:
     branches: ["main", "feat/**"]
