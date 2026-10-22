@@ -18,7 +18,7 @@ main{max-width:1180px;margin:auto;padding:32px clamp(16px,4vw,52px) 64px}.top{di
 <body>
 <header><div class="brand">ELITE <span>CUTS</span></div><div class="eyebrow">Salon Command · MVP</div></header>
 <main>
-<section class="top"><div><div class="eyebrow">Delhi NCR pilot · operations preview</div><h1>Every chair.<br>One live queue.</h1><p>Manage bookings and service flow. Demo geofence events are labelled and never represented as real GPS.</p></div><div><span id="connection" class="status">Checking API…</span><div class="actions"><button class="secondary" id="refresh">Refresh queue</button></div></div></section>
+<section class="top"><div><div class="eyebrow">Delhi NCR pilot · operations preview</div><h1>Every chair.<br>One live queue.</h1><p>Manage bookings and service flow. Demo geofence events are labelled and never represented as real GPS.</p></div><div><span id="connection" class="status">Checking API…</span><label style="display:grid;gap:6px;margin-top:10px;color:var(--muted);font-size:12px">API access token (stored only for this tab)<input id="api-token" type="password" autocomplete="off" placeholder="Paste ELITE_CUTS_API_TOKEN"></label><div class="actions"><button class="secondary" id="save-token">Connect securely</button><button class="secondary" id="refresh">Refresh queue</button></div></div></section>
 <div class="notice">DEMO MODE — this dashboard reads the connected local API. Geofence events are simulated; no live GPS, customer notifications, payments, or salon deployment are enabled.</div>
 <section class="grid">
 <div class="metric"><small>Active bookings</small><strong id="active">—</strong></div>
@@ -47,7 +47,7 @@ main{max-width:1180px;margin:auto;padding:32px clamp(16px,4vw,52px) 64px}.top{di
 </main><footer>ELITE CUTS · Operational foundation only · No live device telemetry claimed</footer>
 <script>
 const $=id=>document.getElementById(id);
-const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json'},...options});const data=await r.json();if(!r.ok)throw new Error(data.detail||'Request failed');return data};
+const api=async(path,options={})=>{const headers={'Content-Type':'application/json',...(options.headers||{})};const token=sessionStorage.getItem('eliteCutsApiToken');if(token)headers.Authorization='Bearer '+token;const r=await fetch(path,{...options,headers});const data=await r.json();if(!r.ok)throw new Error(data.detail||'Request failed');return data};
 const pretty=s=>s.replaceAll('_',' ');
 async function refresh(){
  try{
@@ -65,6 +65,8 @@ async function refresh(){
 function show(s){$('message').textContent=s}
 $('booking-form').addEventListener('submit',async e=>{e.preventDefault();$('submit').disabled=true;try{const data=Object.fromEntries(new FormData(e.target));data.estimated_minutes=Number(data.estimated_minutes);const b=await api('/v1/bookings',{method:'POST',body:JSON.stringify(data)});show('Booking created: '+b.token);e.target.reset();e.target.elements.salon_id.value='connaught-place-demo';await refresh()}catch(err){show(err.message)}finally{$('submit').disabled=false}});
 $('simulate').addEventListener('click',async()=>{try{const id=$('event-booking').value;if(!id)throw new Error('Create a booking first');const r=await api('/v1/geofence-events',{method:'POST',body:JSON.stringify({booking_id:id,distance_meters:Number($('distance').value),source:'simulator'})});show('Demo event processed: '+r.event+' · GPS verified: no');await refresh()}catch(e){show(e.message)}});
+$('api-token').value=sessionStorage.getItem('eliteCutsApiToken')||'';
+$('save-token').addEventListener('click',()=>{const token=$('api-token').value.trim();if(!token){sessionStorage.removeItem('eliteCutsApiToken');show('Token cleared for this tab.');return}sessionStorage.setItem('eliteCutsApiToken',token);show('Token saved for this tab session.');refresh()});
 $('refresh').addEventListener('click',refresh);refresh();
 </script>
 </body></html>
