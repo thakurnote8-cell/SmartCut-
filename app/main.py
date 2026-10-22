@@ -33,6 +33,17 @@ class GeofenceEvent(BaseModel):
     source: Literal["simulator"] = "simulator"
 
 
+class OperationsInsightRequest(BaseModel):
+    salon_id: str = Field(default="connaught-place-demo", min_length=2, max_length=80)
+
+
+class OperationsInsight(BaseModel):
+    summary: str
+    observations: list[str]
+    recommendations: list[str]
+    limitations: list[str]
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -213,6 +224,64 @@ def complete_service(booking_id: str):
         )
         updated = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
     return row_dict(updated)
+
+
+def generate_operations_insight(salon_id: str) -> OperationsInsight:
+    """Send aggregate operational counts only; no customer names or location history."""
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    model = os.getenv("OPENAI_MODEL", "").strip()
+    if not api_key or not model:
+        raise HTTPException(status_code=503, detail="AI insights require OPENAI_API_KEY and OPENAI_MODEL.")
+    from openai import OpenAI
+
+    init_db()
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT status, COUNT(*) AS n FROM bookings WHERE salon_id=? GROUP BY status",
+            (salon_id,),
+        ).fetchall()
+    counts = {row["status"]: row["n"] for row in rows}
+    snapshot = {
+        "salon_id": salon_id,
+        "counts_by_status": counts,
+        "active_bookings": sum(counts.get(s, 0) for s in ("booked", "approaching", "arrived", "in_service", "waitlisted")),
+        "source": "database counts; not live device telemetry",
+    }
+    schema = {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string"},
+            "observations": {"type": "array", "items": {"type": "string"}},
+            "recommendations": {"type": "array", "items": {"type": "string"}},
+            "limitations": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["summary", "observations", "recommendations", "limitations"],
+        "additionalProperties": False,
+    }
+    response = OpenAI(api_key=api_key).responses.create(
+        model=model,
+        instructions=(
+            "You are Elite Cuts operations analyst. Review only the supplied aggregate counts. "
+            "Do not invent wait times, demand forecasts, or causal claims. Recommend low-risk "
+            "operational checks, not automatic actions. Explicitly note that these counts do not "
+            "include real GPS or measured service durations. Return concise structured output."
+        ),
+        input=json.dumps(snapshot),
+        text={"format": {"type": "json_schema", "name": "elite_cuts_insight", "strict": True, "schema": schema}},
+    )
+    if not response.output_text:
+        raise ValueError("Model returned no structured insight")
+    return OperationsInsight.model_validate_json(response.output_text)
+
+
+@app.post("/v1/ai/operations-insight", response_model=OperationsInsight)
+def operations_insight(request: OperationsInsightRequest):
+    try:
+        return generate_operations_insight(request.salon_id)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="AI insight provider failed or returned invalid output.")
 
 
 @app.get("/v1/metrics")
