@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 DB_PATH = os.getenv("ELITE_CUTS_DB_PATH", "./data/elite_cuts.db")
@@ -99,6 +100,11 @@ def startup():
 
 def row_dict(row):
     return dict(row) if row is not None else None
+
+
+@app.get("/", include_in_schema=False)
+def dashboard():
+    return FileResponse(Path(__file__).resolve().parent.parent / "index.html")
 
 
 @app.get("/health")
