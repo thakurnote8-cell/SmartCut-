@@ -183,6 +183,8 @@ def test_operational_api_rejects_missing_bearer_token(client):
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
 
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["cache-control"] == "no-store"
 
 def test_operational_api_fails_closed_without_configured_token(client, monkeypatch):
     monkeypatch.delenv("ELITE_CUTS_API_TOKEN", raising=False)
