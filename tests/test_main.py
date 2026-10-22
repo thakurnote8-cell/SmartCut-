@@ -123,3 +123,37 @@ def test_ai_insight_sends_aggregate_counts_not_customer_pii(client, monkeypatch)
     assert result.summary == expected.summary
     assert "Private Test Name" not in captured["input"]
     assert "counts_by_status" in captured["input"]
+
+
+def test_geofence_events_cannot_regress_arrived_booking(client):
+    booking = client.post("/v1/bookings", json={
+        "customer_name": "Arrival Customer", "service": "Haircut"
+    }).json()
+    arrived = client.post("/v1/geofence-events", json={
+        "booking_id": booking["id"], "distance_meters": 100
+    })
+    assert arrived.status_code == 200
+    assert arrived.json()["booking"]["status"] == "arrived"
+
+    delayed_outer_ring = client.post("/v1/geofence-events", json={
+        "booking_id": booking["id"], "distance_meters": 2500
+    })
+    assert delayed_outer_ring.status_code == 200
+    assert delayed_outer_ring.json()["booking"]["status"] == "arrived"
+    assert delayed_outer_ring.json()["event"] == "simulated_arrival_already_confirmed"
+
+
+def test_waitlisted_booking_rejects_geofence_events(client):
+    for i in range(5):
+        response = client.post("/v1/bookings", json={
+            "customer_name": f"Customer {i}", "service": "Haircut", "salon_id": "full-salon"
+        })
+        assert response.status_code == 201
+    waitlisted = client.post("/v1/bookings", json={
+        "customer_name": "Waitlisted Person", "service": "Haircut", "salon_id": "full-salon"
+    }).json()
+    assert waitlisted["status"] == "waitlisted"
+    response = client.post("/v1/geofence-events", json={
+        "booking_id": waitlisted["id"], "distance_meters": 100
+    })
+    assert response.status_code == 409
