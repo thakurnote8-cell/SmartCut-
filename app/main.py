@@ -126,11 +126,11 @@ async def require_api_token(request: Request, call_next):
         return response
     expected = os.getenv("ELITE_CUTS_API_TOKEN", "").strip()
     if len(expected) < 32:
-        return JSONResponse(status_code=503, content={"detail": "API unavailable: configure ELITE_CUTS_API_TOKEN with at least 32 characters."})
+        return JSONResponse(status_code=503, content={"detail": "API unavailable: configure ELITE_CUTS_API_TOKEN with at least 32 characters."}, headers={"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
     supplied = request.headers.get("authorization", "")
     scheme, _, credential = supplied.partition(" ")
     if scheme.lower() != "bearer" or not credential or not hmac.compare_digest(credential, expected):
-        return JSONResponse(status_code=401, content={"detail": "Valid bearer token required."}, headers={"WWW-Authenticate": "Bearer"})
+        return JSONResponse(status_code=401, content={"detail": "Valid bearer token required."}, headers={"WWW-Authenticate": "Bearer", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"})
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
