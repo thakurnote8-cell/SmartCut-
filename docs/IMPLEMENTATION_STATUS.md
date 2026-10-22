@@ -13,7 +13,7 @@
 ## Not implemented / not verified
 - No customer mobile app, authentication, salon tenant isolation, production database, payments, messaging, real GPS, map matching, ETA prediction, or vendor integration.
 - No production hosting or deployment.
-- No GPT model call yet. AI recommendations should be added only after operational data contracts and access controls are reviewed.
+- An optional GPT-backed `/v1/ai/operations-insight` endpoint is implemented. It sends aggregate booking counts only (not customer names) and returns structured observations/recommendations; it does not execute actions. It requires `OPENAI_API_KEY` and `OPENAI_MODEL`. Provider calls and data handling still need privacy, access-control, and operational review before any pilot.
 
 ## Local run
 ```bash
