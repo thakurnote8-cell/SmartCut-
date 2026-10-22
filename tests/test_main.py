@@ -194,3 +194,15 @@ def test_operational_api_fails_closed_without_configured_token(client, monkeypat
 def test_booking_rejects_unexpected_fields(client):
     response = client.post("/v1/bookings", json={"customer_name": "Customer", "service": "Haircut", "is_admin": True})
     assert response.status_code == 422
+
+
+def test_security_headers_are_set_on_responses(client):
+    response = client.get("/health")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_health_endpoint_remains_public(client):
+    response = TestClient(cuts.app).get("/health")
+    assert response.status_code == 200
