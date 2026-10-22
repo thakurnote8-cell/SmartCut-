@@ -1,6 +1,7 @@
 """Elite Cuts MVP API. Queue and booking state is local SQLite, not a production service."""
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import sqlite3
@@ -11,8 +12,9 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.requests import Request
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 DB_PATH = os.getenv("ELITE_CUTS_DB_PATH", "./data/elite_cuts.db")
 app = FastAPI(
@@ -23,6 +25,16 @@ app = FastAPI(
 
 
 class BookingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("customer_name")
+    @classmethod
+    def normalize_customer_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("customer_name must not be blank")
+        return value
+
     customer_name: str = Field(min_length=2, max_length=80)
     service: Literal["Haircut", "Beard", "Haircut + Beard", "Premium Grooming"]
     salon_id: str = Field(default="connaught-place-demo", min_length=2, max_length=80)
@@ -30,12 +42,16 @@ class BookingRequest(BaseModel):
 
 
 class GeofenceEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     booking_id: str
     distance_meters: int = Field(ge=0, le=100000)
     source: Literal["simulator"] = "simulator"
 
 
 class OperationsInsightRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     salon_id: str = Field(default="connaught-place-demo", min_length=2, max_length=80)
 
 
@@ -57,6 +73,7 @@ def db():
         path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(str(path), timeout=10)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
     try:
         yield connection
         connection.commit()
@@ -94,6 +111,24 @@ def init_db():
         """)
 
 
+
+
+@app.middleware("http")
+async def require_api_token(request: Request, call_next):
+    """Fail closed for operational routes unless a strong shared API token is configured."""
+    protected = request.url.path.startswith("/v1/") or request.url.path in {"/docs", "/redoc", "/openapi.json"}
+    if not protected:
+        return await call_next(request)
+    expected = os.getenv("ELITE_CUTS_API_TOKEN", "").strip()
+    if len(expected) < 32:
+        return JSONResponse(status_code=503, content={"detail": "API unavailable: configure ELITE_CUTS_API_TOKEN with at least 32 characters."})
+    supplied = request.headers.get("authorization", "")
+    scheme, _, credential = supplied.partition(" ")
+    if scheme.lower() != "bearer" or not credential or not hmac.compare_digest(credential, expected):
+        return JSONResponse(status_code=401, content={"detail": "Valid bearer token required."}, headers={"WWW-Authenticate": "Bearer"})
+    return await call_next(request)
+
+
 @app.on_event("startup")
 def startup():
     init_db()
@@ -127,6 +162,8 @@ def create_booking(request: BookingRequest):
     init_db()
     booking_id = str(uuid.uuid4())
     with db() as conn:
+        # Serialize chair allocation to avoid duplicate assignments from simultaneous requests.
+        conn.execute("BEGIN IMMEDIATE")
         # Chair assignment is based on actual active rows, never a fabricated live status.
         active = conn.execute(
             "SELECT chair_number FROM bookings WHERE salon_id=? AND status IN ('booked','approaching','arrived','in_service')",
