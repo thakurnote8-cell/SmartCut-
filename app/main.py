@@ -118,7 +118,12 @@ async def require_api_token(request: Request, call_next):
     """Fail closed for operational routes unless a strong shared API token is configured."""
     protected = request.url.path.startswith("/v1/") or request.url.path in {"/docs", "/redoc", "/openapi.json"}
     if not protected:
-        return await call_next(request)
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("Cache-Control", "no-store")
+        return response
     expected = os.getenv("ELITE_CUTS_API_TOKEN", "").strip()
     if len(expected) < 32:
         return JSONResponse(status_code=503, content={"detail": "API unavailable: configure ELITE_CUTS_API_TOKEN with at least 32 characters."})
